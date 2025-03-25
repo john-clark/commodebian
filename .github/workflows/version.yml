@@ -1,0 +1,58 @@
+name: Auto Version Bump
+
+on:
+  push:
+    branches:
+      - main  # Adjust to your default branch
+
+jobs:
+  version-bump:
+    runs-on: ubuntu-latest  # Base runner (needed to launch container)
+    container:
+      image: debian:12.9  # Debian 12.9 container
+    steps:
+      # Checkout the repository with full history
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # Needed to push changes
+          fetch-depth: 0  # Fetch all history for commit analysis
+
+      # Install necessary tools (git, sed, awk) in the Debian container
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y git sed gawk curl
+
+      # Set up Git config
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+
+      # Read current version from the script
+      - name: Get current version
+        id: get_version
+        run: |
+          CURRENT_VERSION=$(grep -m1 '^VERSION=[0-9]\+\.[0-9]\+' commodebian.sh | cut -d= -f2)
+          echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+
+      # Increment the version (simple minor bump for this example)
+      - name: Bump version
+        id: bump_version
+        run: |
+          CURRENT_VERSION="${{ steps.get_version.outputs.CURRENT_VERSION }}"
+          NEW_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{print $1"."$2+1}')
+          sed -i "s/^VERSION=.*/VERSION=$NEW_VERSION/" commodebian.sh
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      # Commit and push the updated script
+      - name: Commit version update
+        run: |
+          git add commodebian.sh
+          git commit -m "Bump version to ${{ steps.bump_version.outputs.NEW_VERSION }} [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
