@@ -12,7 +12,7 @@ PACKAGES="pv build-essential autoconf automake libtool libsdl2-dev libsdl2-image
 
 AUTOSTART_LINES=(
     "# Commodebian Autostart"
-    "if [ -f \"$COMMODEBIAN_CONF\" ]; then clear && \"$INSTALL_LOCATION/bin/commodebian.sh\" boot || \"$INSTALL_LOCATION/bin/commodebian.sh\" menu; fi"
+    "if [ -f \"$COMMODEBIAN_CONF\" ]; then clear && $INSTALL_LOCATION/bin/commodebian.sh boot || $INSTALL_LOCATION/bin/commodebian.sh menu; fi"
 )
 
 # Check if the script is being run as root
@@ -260,7 +260,6 @@ TAPE=$INSTALL_LOCATION/share/vice/C64/blank.t64
 #DEFAULT CARTRIDGE
 CRT=$INSTALL_LOCATION/share/vice/C64/blank.crt
 EOF
-
     # Check if the file was created successfully
     if [ $? -eq 0 ]; then
         dialog --colors --msgbox "\Z2Configuration file created successfully.\Zn" 6 50
@@ -269,7 +268,7 @@ EOF
         return 1
     fi
     # Set the file permissions
-    chmod 644 $COMMODEBIAN_CONF
+    chmod 666 $COMMODEBIAN_CONF
 }
 
 # Function to display the status of the last command
@@ -924,6 +923,16 @@ function change_config {
     fi
 }
 
+# function to check if running in ssh
+function check_ssh {
+    if [ "$SSH_CONNECTION" ]; then
+        # Running in a remote session
+        echo "Detected: Remote SSH session."
+        echo "Please run this script from the console or terminal."
+        exit 1
+    fi
+}
+
 # Function to display the about menu
 function show_about_menu {
     dialog --clear --backtitle "Commodebian" \
@@ -969,6 +978,7 @@ function shutdown_function {
 case "$1" in
     boot)
         # this is to run the emulator at boot
+        check_ssh
         echo "Running emulator..."
         boot_emu
         exit 0
@@ -1041,13 +1051,6 @@ check_commodebian_install
 # check if check was successful
 if ! [ $? -eq 0 ]; then
     echo "Error: Commodebian not setup. Please run the script with the sudo and the install option."
-    exit 1
-fi
-
-if [ "$SSH_CONNECTION" ]; then
-    # Running in a remote session
-    echo "Detected: Remote SSH session."
-    echo "Please run this script from the console or terminal."
     exit 1
 fi
 
