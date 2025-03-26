@@ -7,7 +7,6 @@ on:
 
 jobs:
   version-bump:
-    runs-on: ubuntu-latest  # Base runner (needed to launch container)
     container:
       image: debian:12.9  # Debian 12.9 container
     steps:
@@ -41,10 +40,14 @@ jobs:
       - name: Get current version
         id: get_version
         run: |
+          # Debugging: Print the content of commodebian.sh
+          cat commodebian.sh
+
+          # Extract the current version
           CURRENT_VERSION=$(grep -m1 '^VERSION=[0-9]\+\.[0-9]\+' commodebian.sh | cut -d= -f2)
           echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "Current version: $CURRENT_VERSION"
-          
+
           # Debugging: Check if CURRENT_VERSION is set
           if [ -z "$CURRENT_VERSION" ]; then
             echo "CURRENT_VERSION is not set"
