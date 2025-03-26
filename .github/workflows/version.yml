@@ -23,7 +23,12 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}  # Needed to push changes
           fetch-depth: 0  # Fetch all history for commit analysis
-
+          
+      # Configure Git to trust the repository directory
+      - name: Configure Git safe directory
+        run: |
+          git config --global --add safe.directory /__w/commodebian/commodebian
+          
       # Debugging step to check the current directory and git status
       - name: Debug current directory after checkout
         run: |
