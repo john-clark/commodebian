@@ -11,6 +11,12 @@ jobs:
     container:
       image: debian:12.9  # Debian 12.9 container
     steps:
+      # Install necessary tools (git, sed, awk) in the Debian container
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y git sed gawk curl
+
       # Checkout the repository with full history
       - name: Checkout code
         uses: actions/checkout@v3
@@ -18,14 +24,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}  # Needed to push changes
           fetch-depth: 0  # Fetch all history for commit analysis
 
-      # Install necessary tools (git, sed, awk) in the Debian container
-      - name: Install dependencies
-        run: |
-          apt-get update
-          apt-get install -y git sed gawk curl
-
       # Debugging step to check the current directory and git status
-      - name: Debug current directory
+      - name: Debug current directory after checkout
         run: |
           pwd
           ls -la
