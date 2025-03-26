@@ -1,4 +1,4 @@
-# COMMODEBIA
+# COMMODEBIAN
 
 Comedian + Commode = Commodebian ... or maybe just Commodore Debian
 
