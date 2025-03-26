@@ -721,7 +721,11 @@ function show_install_menu {
     HEIGHT=20
     WIDTH=50
     CHOICE_HEIGHT=14
-    BACKTITLE="Commodebian $VERSION"
+    if check_ssh; then
+        BACKTITLE="Commodebian $VERSION"
+    else
+        BACKTITLE="Commodebian $VERSION (TERMINAL MODE)"
+    fi
     TITLE="Commodebian Installer Menu"
     MENU="Use arrow keys to move through options"
     
@@ -748,6 +752,8 @@ function show_install_menu {
                 "" ""
                 8  "  Install autostart  "
                 9  "  Remove autostart  "
+                "" ""
+                "" "  Run with sudo for more options  "
         )
     fi
     while :
@@ -772,6 +778,7 @@ function show_install_menu {
                 9) remove_autostart ;;
                 m) show_main_menu ;;
                 x) clear ; exit 0 ;;
+                *) show_main_menu ;;  # Assign the cancel button to go to the main menu
         esac
     done
 }
@@ -803,12 +810,15 @@ function show_main_menu {
     HEIGHT=34
     WIDTH=90
     CHOICE_HEIGHT=35
-    BACKTITLE="Commodebian $VERSION"
+    if check_ssh; then
+        BACKTITLE="Commodebian $VERSION"
+    else
+        BACKTITLE="Commodebian $VERSION (TERMINAL MODE)"
+    fi
     TITLE="Commodebian Main Menu"
     MENU="Use arrow keys to move through options"
 
     OPTIONS=(
-            
             a  "  ABOUT COMMODEBIAN"
             b  "  START COMMODORE EMULATOR"
             "" ""
@@ -837,6 +847,11 @@ function show_main_menu {
             x  "  Exit to command Line"
     )
 
+    # Remove an option if check_ssh returns true
+    if check_ssh; then
+        OPTIONS=("${OPTIONS[@]/b  \"  START COMMODORE EMULATOR\"/}")
+    fi
+
     while :
         do
             CHOICE=$(dialog --clear \
@@ -845,35 +860,25 @@ function show_main_menu {
                         --menu "$MENU" \
                         $HEIGHT $WIDTH $CHOICE_HEIGHT \
                         "${OPTIONS[@]}" \
-                        2>&1 >/dev/tty)
+                        2>&1 >/dev/tty || true)  # Suppress cancel button behavior
 
         clear
         case $CHOICE in
             
-            1)  change_config "EMU" "$INSTALL_LOCATION/bin/x64"
+            1)  change_config "EMU" "$INSTALL_LOCATION/bin/x64" ;;
+            2)  change_config "EMU" "$INSTALL_LOCATION/bin/x64dtv" ;;
+            3)  change_config "EMU" "$INSTALL_LOCATION/bin/x64sc" ;;
+            4)  change_config "EMU" "$INSTALL_LOCATION/bin/x64sc" ;;
+            5)  change_config "EMU" "$INSTALL_LOCATION/bin/x128" ;;
+            6)  change_config "EMU" "$INSTALL_LOCATION/bin/x128" 
+                change_config "OPTS" "-sdl2 -80col"
                 ;;
-            2)  change_config "EMU" "$INSTALL_LOCATION/bin/x64dtv"
-                ;;
-            3)  change_config "EMU" "$INSTALL_LOCATION/bin/x64sc"
-                ;;
-            4)  change_config "EMU" "$INSTALL_LOCATION/bin/x64sc"
-                ;;
-            5)  change_config "EMU" "$INSTALL_LOCATION/bin/x128"
-                ;;
-            6)  change_config "EMU" "$INSTALL_LOCATION/bin/x128"
-                ;;
-            7)  change_config "EMU" "$INSTALL_LOCATION/bin/xcbm2"
-                ;;
-            8)  change_config "EMU" "$INSTALL_LOCATION/bin/xcbm5x0"
-                ;;
-            9)  change_config "EMU" "$INSTALL_LOCATION/bin/xvic"
-                ;;
-            10) change_config "EMU" "$INSTALL_LOCATION/bin/xplus4"
-                ;;
-            11) change_config "EMU" "$INSTALL_LOCATION/bin/xpet"
-                ;;
+            7)  change_config "EMU" "$INSTALL_LOCATION/bin/xcbm2" ;;
+            8)  change_config "EMU" "$INSTALL_LOCATION/bin/xcbm5x0" ;;
+            9)  change_config "EMU" "$INSTALL_LOCATION/bin/xvic" ;;
+            10) change_config "EMU" "$INSTALL_LOCATION/bin/xplus4" ;;
+            11) change_config "EMU" "$INSTALL_LOCATION/bin/xpet" ;;
             a)  show_about_menu
-                #less -P "Use arrow up and down keys to scroll - Press q to quit" $INSTALL_LOCATION/etc/commodebian/installation_guide.txt   
                 ;;
             b)  boot_emu
                 ;;
