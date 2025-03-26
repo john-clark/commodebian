@@ -3,16 +3,16 @@
 # Commodebian - A menu system for Commodore Vice Emulator 
 # copyright (c) 2025 - John Clark
 # https://github.com/john-clark/commodebian/
-
-VERSION=0.3
+VERSION=0.2
+USER_NAME="emu" # Replace 'your_username' with your actual username
 ONLINE_URL="https://raw.githubusercontent.com/john-clark/commodebian/main/commodebian.sh" # URL to download the latest version of the script
 INSTALL_LOCATION="/usr/local" # Location to install Commodebian
 COMMODEBIAN_CONF="$INSTALL_LOCATION/etc/commodebian.conf" # Configuration file
 PACKAGES="pv build-essential autoconf automake libtool libsdl2-dev libsdl2-image-dev libcurl4-openssl-dev libglew-dev libpng-dev zlib1g-dev flex byacc xa65 dos2unix" # Packages to install
 TCPSER_URL="https://github.com/go4retro/tcpser" # URL to download tcpser
 TCPSER_BIN="$INSTALL_LOCATION/bin/tcpser" # tcpser binary location
-
-AUTOSTART_LINES=(
+PROFILE_FILE="/home/$USER_NAME/.profile" # Profile file to add autostart lines
+PROFILE_AUTOSTART_LINES=(
     "# Commodebian Autostart"
     "if [ -f \"$COMMODEBIAN_CONF\" ]; then clear && $INSTALL_LOCATION/bin/commodebian.sh boot || $INSTALL_LOCATION/bin/commodebian.sh menu; fi"
 )
@@ -20,19 +20,49 @@ AUTOSTART_LINES=(
 # Check if the script is being run as root
 ROOT=$( [ "$(id -u)" -eq 0 ] && echo "true" || echo "false" )
 
-# Determine the regular user's home directory if running with sudo
-if [ -n "$SUDO_USER" ]; then
-    # Get the home directory of the user who invoked sudo
-    USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
-    # Check if the home directory was found
-    if [ -z "$USER_HOME" ]; then
-        echo "Error: Could not determine home directory for user $SUDO_USER."
-        exit 1
+# Function to check if sudo is available and the user has permission
+function check_sudo {
+    # Check if sudo is installed
+    if ! command -v sudo &> /dev/null; then
+        echo "Error: 'sudo' is not installed. Please install it and try again."
+        return 1
     fi
-else
-    USER_HOME="$HOME"  # Fallback to $HOME if running as root without sudo
-fi
-PROFILE_FILE="$USER_HOME/.profile"
+    # Check if the user has sudo privileges
+    if ! sudo -n true 2>/dev/null; then
+        echo "Error: You do not have permission to use 'sudo' or a password is required."
+        return 1
+    fi
+    return 0
+}
+
+# Function to run a command with sudo
+function run_with_sudo {
+    # Check if sudo is available
+    check_sudo || return 1
+
+    # Run the command with sudo
+    sudo "$@"
+}
+
+# Function to change file permissions (#fix this to either use echo or dialog)
+function change_file_permissions {
+    local file="$1"
+    local permissions="$2"
+
+    if [ -z "$file" ] || [ -z "$permissions" ]; then
+        echo "Error: File or permissions not specified."
+        return 1
+    fi
+
+    echo "Changing permissions of $file to $permissions"
+    run_with_sudo chmod "$permissions" "$file" || {
+        echo "Error: Failed to change permissions for $file"
+        return 1
+    }
+
+    echo "Permissions changed successfully for $file"
+    return 0
+}
 
 # Function to check if running in ssh
 function check_ssh {
@@ -131,14 +161,16 @@ function check_script_location {
 
 # Function to check if prerequisites are installed
 function check_prerequisites {
-    # Check if dialog is installed
-    if ! command -v dialog &> /dev/null; then
-        echo "dialog is not installed. Run \"commodebian install\" with sudo."
-        exit 1
-    fi
-    # Check if wget is installed
-    if ! command -v wget &> /dev/null; then
-        echo "wget is not installed. Run \"commodebian install\" with sudo."
+    local missing=()
+    for cmd in dialog wget sudo; do
+        if ! command -v "$cmd" &> /dev/null; then
+            missing+=("$cmd")
+        fi
+    done
+
+    if [ ${#missing[@]} -ne 0 ]; then
+        echo "The following prerequisites are missing: ${missing[*]}"
+        echo "Run \"commodebian install\" as root to install them."
         exit 1
     fi
 }
@@ -234,52 +266,181 @@ function change_config {
     fi
 }
 
-# Function to install Commodebian (makes sure dialog, wget and commodebian.sh are installed)
+# Function to install Commodebian (ensures dialog, wget, and commodebian.sh are installed)
 function install_commodebian {
-    setup_message="Setting up Commodebian...\n"
-    # Check if script is run with sudo or as root
+    echo "Setting up Commodebian..."
+
+    # Ensure the script is run with root privileges
     if [ "$ROOT" != "true" ]; then
-        echo -e "\033[31mCommodebian is not yet setup and must be run as root or with sudo.\033[0m"
+        echo -e "\033[31mError: Commodebian must be run as root or with sudo.\033[0m"
         exit 1
-    else
-        setup_message+="Running with correct permissions.\n"
     fi
 
-    setup_message+="Checking for required packages...\n"
-    # Requirements for this script
-    if ! command -v dialog &> /dev/null; then
-        setup_message+="dialog is not installed. Installing it now...\n"
-        DEBIAN_FRONTEND=noninteractive apt-get install -y dialog -qq < /dev/null > /dev/null
-        [ $? -ne 0 ] && { echo "Failed to install dialog. Please check your system's package manager or network connection."; exit 1; }
+    # Install or update the script in the target location
+    if [ ! -f "$INSTALL_LOCATION/bin/commodebian.sh" ]; then
+        echo "Commodebian is not installed. Installing..."
+        cp "$0" "$INSTALL_LOCATION/bin/commodebian.sh" || {
+            echo "Error: Failed to copy script to $INSTALL_LOCATION/bin. Check your permissions."
+            exit 1
+        }
+        chmod +x "$INSTALL_LOCATION/bin/commodebian.sh"
+        echo "Commodebian installed successfully."
     else
-        setup_message+="dialog is installed.\n"
-    fi
-    if ! command -v wget &> /dev/null; then
-        setup_message+="wget is not installed. Installing it now...\n"
-        DEBIAN_FRONTEND=noninteractive apt-get install -y wget -qq < /dev/null > /dev/null
-        [ $? -ne 0 ] && { echo "Failed to install wget. Please check your system's package manager or network connection."; exit 1; }
-    else
-        setup_message+="wget is installed.\n"
-    fi
-
-    # Check if the script is being run from $INSTALL_LOCATION/bin
-    if ! [ -f "$INSTALL_LOCATION/bin/commodebian.sh" ]; then
-        setup_message+="Commodebian is not installed. Installing now...\n"
-        cp "$0" "$INSTALL_LOCATION/bin/commodebian.sh" || { echo "Failed to copy script to $INSTALL_LOCATION/bin. Please check your permissions."; exit 1; }
-        chmod +x "$INSTALL_LOCATION/bin/commodebian.sh" || { echo "Failed to copy script to $INSTALL_LOCATION/bin. Please check your permissions."; exit 1; }
-        setup_message+="Commodebian installed successfully.\n"
-    else
-        diff "$0" "$INSTALL_LOCATION/bin/commodebian.sh" > /dev/null
-        if [ $? -ne 0 ]; then
-            setup_message+="Commodebian is outdated. Updating now...\n"
-            mv "$INSTALL_LOCATION/bin/commodebian.sh" "$INSTALL_LOCATION/bin/commodebian.sh.bak" || { echo "Failed to backup script."; exit 1; }
-            cp "$0" "$INSTALL_LOCATION/bin/commodebian.sh" || { echo "Failed to copy script."; exit 1; }
-            setup_message+="Commodebian updated successfully.\n"
+        if ! diff "$0" "$INSTALL_LOCATION/bin/commodebian.sh" > /dev/null; then
+            echo "Commodebian is outdated. Updating..."
+            mv "$INSTALL_LOCATION/bin/commodebian.sh" "$INSTALL_LOCATION/bin/commodebian.sh.bak" || {
+                echo "Error: Failed to backup the existing script."
+                exit 1
+            }
+            cp "$0" "$INSTALL_LOCATION/bin/commodebian.sh" || {
+                echo "Error: Failed to copy the updated script."
+                exit 1
+            }
+            chmod +x "$INSTALL_LOCATION/bin/commodebian.sh"
+            echo "Commodebian updated successfully."
+        else
+            echo "Commodebian is already up to date."
         fi
     fi
 
-    setup_message+="Commodebian setup complete.\n"
-    echo -e "\n$setup_message"
+    # validate user exists
+    if ! id "$USER_NAME" &> /dev/null; then
+        echo "User '$USER_NAME' does not exist. Creating..."
+        useradd -m "$USER_NAME" || {
+            echo "Error: Failed to create user '$USER_NAME'."
+            exit 1
+        }
+    fi
+    
+    # next update profile
+    if ! [ -f "$PROFILE_FILE" ]; then
+        echo "Profile file not found. Creating..."
+        touch "$PROFILE_FILE" || {
+            echo "Error: Failed to create profile file."
+            exit 1
+        }
+    fi
+
+    # Add the lines to .profile if they don't already exist
+    for line in "${PROFILE_AUTOSTART_LINES[@]}"; do
+        if ! grep -Fxq "$line" "$PROFILE_FILE"; then
+            echo "$line" >> "$PROFILE_FILE"
+        fi
+    done
+
+    enable_user_autologin
+
+
+    apt update -qq > /dev/null
+    # if update fails exit
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to update package lists. Check your network connection."
+        exit 1
+    fi
+
+    # check if sudo is installed
+    if ! command -v sudo &> /dev/null; then
+        echo "sudo is not installed. Installing..."
+        apt install -y sudo -qq < /dev/null > /dev/null || {
+            echo "Error: Failed to install sudo. Check your package manager or network connection."
+            exit 1
+        }
+        # Add user to sudo group
+        echo "Adding user '$USER_NAME' to sudo group..."
+        usermod -aG sudo $USER_NAME || {
+            echo "Error: Failed to add user to sudo group."
+            exit 1
+        }
+        # Modify sudoers file to allow NOPASSWD for sudo group
+        echo "Configuring sudoers file to allow passwordless sudo for sudo group..."
+        echo "%sudo   ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/sudo_nopasswd
+        # Set proper permissions on the sudoers file
+        chmod 440 /etc/sudoers.d/sudo_nopasswd
+
+        # Prompt for reboot
+        read -p "Installation complete. The system needs to reboot for changes to take effect. Do you want to reboot now? (y/n): " REBOOT
+        if [[ "$REBOOT" == "y" || "$REBOOT" == "Y" ]]; then
+            echo "Rebooting system..."
+            reboot
+        else
+            echo "Please reboot the system manually for changes to take effect."
+        fi
+    else
+        echo "sudo is already installed."
+    fi
+
+    # Install required packages if missing
+    for pkg in dialog wget unzip; do
+        if ! command -v "$pkg" &> /dev/null; then
+            echo "$pkg is not installed. Installing..."
+            DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" -qq < /dev/null > /dev/null || {
+                echo "Error: Failed to install $pkg. Check your package manager or network connection."
+                exit 1
+            }
+        else
+            echo "$pkg is already installed."
+        fi
+    done
+
+    echo "Commodebian setup complete."
+}
+
+# Function to enable user autologin
+function enable_user_autologin {
+    # Define paths and service
+    GETTY_SERVICE="getty@tty1.service"
+    OVERRIDE_DIR="/etc/systemd/system/$GETTY_SERVICE.d"
+    OVERRIDE_FILE="$OVERRIDE_DIR/autologin.conf"
+
+    # Create override directory if it doesn’t exist
+    if [ ! -d "$OVERRIDE_DIR" ]; then
+        mkdir -p "$OVERRIDE_DIR"
+        if [ $? -ne 0 ]; then
+            echo "Error: Failed to create directory $OVERRIDE_DIR."
+            exit 1
+        fi
+    fi
+
+    # Write the autologin override configuration
+    cat > "$OVERRIDE_FILE" << EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin $USER --noclear %I \$TERM
+EOF
+
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to write autologin configuration to $OVERRIDE_FILE."
+        exit 1
+    fi
+
+    # Reload systemd to apply changes
+    systemctl daemon-reload
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to reload systemd configuration."
+        exit 1
+    fi
+
+    # Enable the service (optional, usually enabled by default)
+    systemctl enable "$GETTY_SERVICE" 2>/dev/null
+
+    # Inform the user
+    echo "Autologin configured for user '$USER' on TTY1."
+}
+
+#function to disable user autologin
+function disable_user_autologin {
+    OVERRIDE_DIR="/etc/systemd/system/$GETTY_SERVICE.d"
+    OVERRIDE_FILE="$OVERRIDE_DIR/autologin.conf"
+    # move override file to backup in home folder
+    mv $OVERRIDE_FILE /home/$USER_NAME/autologin.conf.bak
+    # Reload systemd to apply changes
+    systemctl daemon-reload
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to reload systemd configuration."
+        exit 1
+    fi
+    # Inform the user
+    echo "Autologin disabled for user '$USER' on TTY1."
 }
 
 # Function to setup Commodebian
@@ -344,7 +505,7 @@ cat << EOF > $COMMODEBIAN_CONF
 #Commodebian Configuration File
 #This file is automatically generated by the Commodebian script.
 #Do not edit this file directly. Use the Commodebian script to modify it.
-VERSION=0.3
+VERSION=$VERSION
 #DEFAULT EMULATOR
 EMU=$INSTALL_LOCATION/bin/x64
 #DEFAULT OPTIONS
@@ -886,10 +1047,6 @@ function view_tcpser_help {
 
 # Function to install autostart
 function install_autostart {
-    check_prerequisites
-    check_commodebian_install
-    check_commodebian_setup
-    check_commodebian_version
 
     # Ensure the .profile file exists
     if ! [ -f "$PROFILE_FILE" ]; then
@@ -901,14 +1058,14 @@ function install_autostart {
     fi
 
     # Add the lines to .profile if they don't already exist
-    for line in "${AUTOSTART_LINES[@]}"; do
+    for line in "${PROFILE_AUTOSTART_LINES[@]}"; do
         if ! grep -Fxq "$line" "$PROFILE_FILE"; then
             echo "$line" >> "$PROFILE_FILE"
         fi
     done
 
     # Ensure all lines are written correctly
-    for line in "${AUTOSTART_LINES[@]}"; do
+    for line in "${PROFILE_AUTOSTART_LINES[@]}"; do
         if ! grep -Fxq "$line" "$PROFILE_FILE"; then
             dialog --colors --msgbox "\Z1Error: Failed to write line: $line\Zn" 6 50
             return 1
@@ -920,7 +1077,7 @@ function install_autostart {
 # Function to remove autostart
 function remove_autostart {
     # Escape special characters in the lines for sed
-    for line in "${AUTOSTART_LINES[@]}"; do
+    for line in "${PROFILE_AUTOSTART_LINES[@]}"; do
         escaped_line=$(printf '%s\n' "$line" | sed 's/[]\/$*.^[]/\\&/g')
         sed -i "/$escaped_line/d" "$PROFILE_FILE"
     done
