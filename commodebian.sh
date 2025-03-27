@@ -3,7 +3,7 @@
 # Commodebian - A menu system for Commodore Vice Emulator 
 # copyright (c) 2025 - John Clark
 # https://github.com/john-clark/commodebian/
-VERSION=0.5
+VERSION=0.6
 USER_NAME="emu" # Replace 'your_username' with your actual username
 ONLINE_URL="https://raw.githubusercontent.com/john-clark/commodebian/main/commodebian.sh" # URL to download the latest version of the script
 INSTALL_LOCATION="/usr/local" # Location to install Commodebian
