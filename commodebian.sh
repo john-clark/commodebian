@@ -21,10 +21,6 @@ ROOT=$( [ "$(id -u)" -eq 0 ] && echo "true" || echo "false" )
 
 display_output="console" # Default display output
 
-function wait_for_keypress {
-    read -n 1 -s -r -p "Press any key to continue..."
-}
-
 # Function to display messages in console or dialog
 function display_message {
     local message="$1"             # Message to display
@@ -36,7 +32,8 @@ function display_message {
         # Display a console message
             case "$type" in
                 info) echo -e "$message"                           # Default text for info
-                      wait_for_keypress ;;
+                      #wait_for_keypress 
+                      ;;
                 error) echo -e "\033[31mError: $message\033[0m" ;; # Red text for errors
                 success) echo -e "\033[32m$message\033[0m" ;;      # Green text for success
                 yesno) echo -n "$message"                          # Prompt for yes/no
@@ -55,23 +52,48 @@ function display_message {
             # for each \n add an extra line to the height
             height=$(( $height + $(echo "$message" | grep -o "\n" | wc -l) ))
             case "$type" in
-                info)    dialog --infobox "$message" $height $width                        # Default text for info
+                info)    dialog --infobox --backtitle "$BACKTITLE" "$message" $height $width                        # Default text for info
                          wait_for_keypress ;;
-                error)   dialog --colors --msgbox "\Z1Error: $message\Zn" $height $width ;; # Red text for errors
-                success) dialog --colors --msgbox "\Z2$message\Zn" $height $width ;;        # Green text for success
-                yesno)   dialog --yesno "$message" $height $width                           # Prompt for yes/no
+                error)   dialog --colors --msgbox --backtitle "$BACKTITLE" "\Z1Error: $message\Zn" $height $width ;; # Red text for errors
+                success) dialog --colors --msgbox --backtitle "$BACKTITLE" "\Z2$message\Zn" $height $width ;;        # Green text for success
+                yesno)   dialog --yesno --backtitle "$BACKTITLE" "$message" $height $width                           # Prompt for yes/no
                          return $? ;;
-                *)       dialog --msgbox "$message" $height $width ;;                       # Default text for info
+                *)       dialog --colors --msgbox --backtitle "$BACKTITLE" "$message" $height $width ;;                       # Default text for info
             esac ;;
         # todo: add support for other display types
         *) echo "Invalid display type." ;;
     esac
 }
 
+function wait_for_keypress {
+    read -n 1 -s -r -p "Press any key to continue..."
+}
+
 # Function to display the status of the last command
 function dialog_status {
     [ $1 -eq 0 ] && display_message "successful." "dialog" "success" || display_message "$2 failed." "dialog" "error"
 }
+
+# Function to check if running in ssh
+function check_ssh {
+    if [ "$SSH_CONNECTION" ]; then
+        # Running in a remote session
+        #display_message "Detected Remote SSH session Please run this script from the console or terminal.\n" $display_output "error"
+        return 1
+    fi
+}
+
+# Function to check if running in a console or terminal
+function set_terminal_display {
+    if check_ssh; then
+        # Running in a console
+        BACKTITLE="Commodebian $VERSION"
+    else
+        # Running in a terminal
+        BACKTITLE="Commodebian $VERSION (TERMINAL MODE)"
+    fi
+}
+set_terminal_display
 
 # function to move file to backup
 function backup_file {
@@ -250,27 +272,6 @@ function change_file_permissions {
     return 0
 }
 
-# Function to check if running in ssh
-function check_ssh {
-    if [ "$SSH_CONNECTION" ]; then
-        # Running in a remote session
-        #display_message "Detected: Remote SSH session. Please run this script from the console or terminal." $display_output "info"
-        return 1
-    fi
-}
-
-# Function to check if running in a console or terminal
-function set_terminal_display {
-    if check_ssh; then
-        # Running in a console
-        BACKTITLE="Commodebian $VERSION"
-    else
-        # Running in a terminal
-        BACKTITLE="Commodebian $VERSION (TERMINAL MODE)"
-    fi
-}
-set_terminal_display
-
 #function to check the online version
 function check_online_version {
     #wget the latest version and check version number
@@ -295,7 +296,8 @@ function check_script_version {
     LATEST_VERSION=$(wget -qO- $ONLINE_URL | grep -m1 -o 'VERSION=[0-9]\+\.[0-9]\+' | cut -d= -f2)
     #LATEST_VERSION=$(curl -s $ONLINE_URL | grep 'version=' | awk -F'=' '{print $2}')
     if ! [ "$VERSION" = "$LATEST_VERSION" ]; then
-        display_message "Commodebian is outdated. Would you like to update?" $display_output "yesno"
+        # show current version and other version
+        display_message "Commodebian is outdated. Would you like to update?\n\nThis version: $VERSION\nLatest version: $LATEST_VERSION" $display_output "yesno"
         if [ $? -eq 0 ]; then
             self_update
         fi
@@ -802,7 +804,7 @@ function boot_emu {
     display_message "Running emulator..." $display_output "info"
     # check if running in terminal
     if ! check_ssh; then
-        display_message "This option is only available from the console." "console" "error"
+        display_message "This option is only available from the console." $display_output "error"
         return 1
     fi
     # check to see if script is being run from $INSTALL_LOCATION/bin
@@ -1160,6 +1162,15 @@ function install_vice {
     dialog_status $? "Installed Vice"
 }
 
+# Function to check the Vice installation
+function check_vice_installation {
+    if ! command -v x64 &> /dev/null; then
+        display_message "Vice is not installed. Please install it." "dialog" "error"
+        return 1
+    fi
+    display_message "Vice is installed." "dialog" "success"
+}
+
 # Function to configure system
 function configure_system {
     # check if prerequisites are installed
@@ -1336,6 +1347,7 @@ function check_tcpser {
         fi
     fi
 }
+
 # function to check if tcpser is running
 function check_tcpser_running {
     # Check if tcpser is running
@@ -1353,6 +1365,7 @@ function check_tcpser_running {
         fi
     fi
 }
+
 # function to check if tcpser is configured
 function check_tcpser_config {
     # Check if tcpser is configured
@@ -1515,6 +1528,8 @@ function check_commodebian_setup {
 
     # check config file
     check_config
+    # check if emulator is installed
+    check_vice
 
     # check if user autologin is enabled
     check_user_autologin
@@ -1526,12 +1541,6 @@ function check_commodebian_setup {
     # check if tcpser is running
     check_tcpser_running
 
-    # check if emulator is installed
-    check_emulator
-    # check if emulator is configured
-    check_emulator_config
-    # check if emulator is running
-    check_emulator_running
 }
 
 # Function to edit options
@@ -1974,6 +1983,7 @@ case "$1" in
     --help)
         # Display help message
         echo "Commodebian - A menu system for the Commodore Vice Emulator"
+        echo ""
         echo "Usage: $0 [boot|menu|install|update|--help|--version]"
         echo ""
         echo "Options:"
@@ -2006,33 +2016,37 @@ case "$1" in
 esac
 
 ### script was run with no options ###
+function main_loop {
+    # make sure commodebian is installed correctly
+    check_script_prerequisites
 
-# make sure commodebian is installed correctly
-check_script_prerequisites
+    # if installed change messages do dialog
+    set_message_display
 
-# if installed change messages do dialog
-set_message_display
+    # show welcome message
+    show_welcome
 
-# show welcome message
-show_welcome
-
-# check if commodebian is installed
-check_script_installation
-if ! [ $? -eq 0 ]; then
-    # script not installed
-    display_message "Commodebian not setup. Please run the script with the sudo and the install option." $display_output "error"
-else
-    # script installed
-    # check if commodebian has a config file
-    if ! [ -f $COMMODEBIAN_CONF ]; then
-        show_not_setup
-    fi
-    if [ "$ROOT" = "true" ]; then
-        show_install_menu
+    # check if commodebian is installed
+    check_script_installation
+    if ! [ $? -eq 0 ]; then
+        # script not installed
+        display_message "Commodebian not setup. Please run the script with the sudo and the install option." $display_output "error"
     else
-        show_main_menu
+        # script installed
+        # check if commodebian has a config file
+        if check_config; then
+            show_not_setup
+        fi
+        if [ "$ROOT" = "true" ]; then
+            show_install_menu
+        else
+            show_main_menu
+        fi
     fi
-fi
 
-# show exit message
-show_exit
+    # show exit message
+    show_exit
+}
+
+# Run the main loop
+main_loop
