@@ -101,8 +101,15 @@ safe_exit() {
     fi
 
     # Display exit message
-    type display_message &>/dev/null && display_message "$message" "$display_type" "info" || echo "$message" >&2
+    if [[ "$display_type" == "console" ]]; then
+        echo "$message"
+    elif [[ "$display_type" == "dialog" ]]; then
+        dialog --msgbox "$message" 6 40
+    fi
+
+    # Log the exit message
     log_message "$message"
+    log_message "Exiting with code $exit_code"
 
     # If sourced, return instead of exit to prevent closing the shell
     if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
