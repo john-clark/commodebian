@@ -3,7 +3,7 @@
 # Commodebian - A menu system for Commodore Vice Emulator 
 # copyright (c) 2025 - John Clark
 # https://github.com/john-clark/commodebian/
-VERSION=0.6
+VERSION=0.7
 
 # Requirements:
 # This script requires the following:
