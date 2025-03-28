@@ -1,6 +1,8 @@
 # COMMODEBIAN
 
-Comedian + Commode = Commodebian ... or maybe just Commodore Debian
+Commode + Comedian = Commodebian ... or maybe just Commodore Debian
+
+This program is to help make using Commodore Emulators easier on Debian.
 
 ```
                           _
