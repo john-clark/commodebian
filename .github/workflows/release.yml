@@ -14,41 +14,46 @@ jobs:
       # Step 1: Checkout the repository
       - name: Checkout Repository
         uses: actions/checkout@v3
-
-      # Step 2: Set up Node.js (if needed for versioning tools like `semver`)
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
         with:
-          node-version: '16'
+          fetch-depth: 0 # Ensures full history for git operations
 
-      # Step 3: Update version in files
-      - name: Update Version
+      # Step 2: Extract version from tag
+      - name: Extract Version
+        id: version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          echo "Updating version to $VERSION"
-          # Replace version in files (e.g., system.sh or other scripts)
-          sed -i "s/^VERSION=.*/VERSION=$VERSION/" commodebian-release/functions/system.sh
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -am "Update version to $VERSION"
-          git push
+          VERSION=${{ github.ref_name }}
+          echo "Extracted version: $VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV # Make VERSION available to later steps
+
+      # Step 3: Update version in files (optional)
+      - name: Update Version in Script
+        run: |
+          # Adjust path based on your repo structure
+          if [ -f "commodebian.sh" ]; then
+            sed -i "s/^VERSION=.*/VERSION=${{ env.VERSION }}/" commodebian.sh
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add commodebian.sh
+            git commit -m "Update version to ${{ env.VERSION }}"
+            # Push changes back to the tag (requires workflow scope)
+            git push
+          else
+            echo "commodebian.sh not found, skipping version update"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Step 4: Create a zipped release package
       - name: Create Release Package
         run: |
           mkdir -p release
-          zip -r release/commodebian-$VERSION.zip commodebian-release
-          echo "Release package created: release/commodebian-$VERSION.zip"
+          # Adjust what to include in the zip based on your needs
+          zip -r release/commodebian-${{ env.VERSION }}.zip . -x "*.git*"
+          echo "Release package created: release/commodebian-${{ env.VERSION }}.zip"
 
-      # Step 5: Upload the release package as an artifact
-      - name: Upload Release Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: commodebian-$VERSION
-          path: release/commodebian-$VERSION.zip
-
-      # Step 6: Publish the release on GitHub
+      # Step 5: Create GitHub Release
       - name: Create GitHub Release
+        id: create_release # Add ID to reference outputs
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -61,13 +66,13 @@ jobs:
           draft: false
           prerelease: false
 
-      # Step 7: Upload the release asset
+      # Step 6: Upload Release Asset
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: release/commodebian-${{ github.ref_name }}.zip
-          asset_name: commodebian-${{ github.ref_name }}.zip
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # Reference the ID
+          asset_path: release/commodebian-${{ env.VERSION }}.zip
+          asset_name: commodebian-${{ env.VERSION }}.zip
           asset_content_type: application/zip
