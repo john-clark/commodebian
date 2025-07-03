@@ -137,8 +137,8 @@ function install_tcpser_binary {
     # Check if the tcpser binary exists after compilation
     [ ! -f "$SRC_DIR/tcpser" ] && { display_message "tcpser binary not found in ${SRC_DIR}. Please compile it first." "dialog" "error"; return 1; }
     display_message "Installing tcpser binary to ${BIN_DIR}..." "dialog" "info"
-    
-    run_with_sudo install -m 755 "$SRC_DIR/tcpser" "$BIN_DIR/tcpser" || { display_message "Failed to install tcpser binary" "dialog" "error"; return 1; }
+    #
+    run_with_sudo make install -m 755 "$SRC_DIR/tcpser" "$BIN_DIR/tcpser" || { display_message "Failed to install tcpser binary" "dialog" "error"; return 1; }
     display_message "tcpser binary installed successfully to ${BIN_DIR}." "dialog" "success"
 }
 

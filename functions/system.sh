@@ -182,7 +182,7 @@ function check_script_installation {
         if ! [ -d "$folder" ]; then
             display_message "Missing folder: $folder. Would you like to reinstall Commodebian?" $display_output "yesno"
             if [ $? -eq 0 ]; then
-                run_with_sudo install_commodebian
+                run_with_sudo "$SCRIPT_DIR/commodebian.sh" install
             else
                 display_message "Missing folder: $folder. Installation is incomplete." $display_output "error"
                 return 1
@@ -193,7 +193,7 @@ function check_script_installation {
             if ! [ -f "$folder/$file" ]; then
                 display_message "Missing file: $file in $folder. Would you like to reinstall Commodebian?" $display_output "yesno"
                 if [ $? -eq 0 ]; then
-                    run_with_sudo install_commodebian
+                    run_with_sudo "$SCRIPT_DIR/commodebian.sh" install
                 else
                     display_message "Missing file: $file. Installation is incomplete." $display_output "error"
                     return 1
