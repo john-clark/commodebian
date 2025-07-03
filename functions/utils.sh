@@ -16,10 +16,10 @@ fi
 #   - 0 if not running in a remote SSH session (i.e., running in a console).
 #   - 1 if running in a remote SSH session.
 function check_ssh {
-
+    # Check if SSH_CONNECTION variable is set
     if [ "$SSH_CONNECTION" ]; then
         # Running in a remote session
-        #display_message "Detected Remote SSH session Please run this script from the console or terminal.\n" $display_output "error"
+        #display_message "Detected Remote SSH session, only configuration options available.\n" "$display_output" "error"
         return 1
     fi
 }
@@ -40,17 +40,17 @@ function change_file_permissions {
     local permissions="$2"
 
     if [ -z "$file" ] || [ -z "$permissions" ]; then
-        display_message "File or permissions not specified." $display_output "error"
+        display_message "File or permissions not specified." "$display_output" "error"
         return 1
     fi
 
     echo "Changing permissions of $file to $permissions"
     run_with_sudo chmod "$permissions" "$file" || {
-        display_message "Failed to change permissions for $file" $display_output "error"
+        display_message "Failed to change permissions for $file" "$display_output" "error"
         return 1
     }
 
-    display_message "Permissions changed successfully for $file" $display_output "success"
+    display_message "Permissions changed successfully for $file" "$display_output" "success"
     return 0
 }
 
@@ -65,48 +65,93 @@ function change_file_permissions {
 # Example: display_message "Hello, World!" "dialog" "info"
 # Example: display_message "Are you sure?" "dialog" "yesno"
 function display_message {
+    # Message to display
+    local message="$1"
+    # "console" or "dialog"
+    local display="${2:-console}"
+    # Default type is "info" (can be "info", "error", "success", or "yesno")
+    local type="${3:-info}"
+    
+    if [ -z "$BACKTITLE" ]; then
+  	BACKTITLE="Commodebian"
+    fi
 
-    local message="$1"             # Message to display
-    local display="${2:-console}"  #"console" or "dialog"
-    local type="${3:-info}"        # Default type is "info" (can be "info", "error", "success", or "yesno")
-
+    # Detirmine the display type
     case "$display" in
+      console)
         # Display a console message
-        console)
-            case "$type" in
-                info) echo -e "$message"                           # Default text for info
-                      wait_for_keypress #added for debugging
-                      ;;
-                error) echo -e "\033[31mError: $message\033[0m" ;; # Red text for errors
-                success) echo -e "\033[32m$message\033[0m" ;;      # Green text for success
-                yesno) echo -n -n "$message"                          # Prompt for yes/no
-                    read -p " (y/n): " response
-                    case "$response" in
-                        [yY]) return 0 ;;
-                        *) return 1 ;;
-                    esac ;;          
-                *) echo -e "$message" ;;                              # Default text for info
-            esac ;;
+        case "$type" in
+            # detirmine the message type
+            info)
+                # Display an info message in the console 
+                printf "%b\n" "$message"            
+                wait_for_keypress           #added for debugging
+                ;;
+            error)
+                # Red text for errors in the console
+                printf "\033[31m%b\033[0m\n" "Error: $message" 
+                ;;
+            success)
+                # Green text for success in the console
+                printf "\033[32m%b\033[0m\n" "$message" 
+                ;;
+            yesno)
+                printf "%b" "$message"
+                # Prompt for yes/no response
+                read -r -p " (y/n): " response
+                case "$response" in
+                    [yY]) 
+                        return 0 
+                        ;;
+                    *)  
+                        return 1 
+                        ;;
+                esac ;;          
+            *) 
+                # Default text for non-specific type
+                printf "%b\n" "$message" ;;
+        esac ;;
+      dialog) 
         # Display a dialog message
-        dialog)
-            # automatically detirmine the message box size based on the message length
-            local height=$(( $(echo "$message" | wc -l) + 5 ))
-            local width=$(( ${#message} + 10 ))
-            # for each \n add an extra line to the height
-            height=$(( $height + $(echo "$message" | grep -o "\n" | wc -l) ))
-            case "$type" in
-                info)    dialog --infobox --backtitle "$BACKTITLE" "$message" $height $width                        # Default text for info
-                         wait_for_keypress #added for debugging
-                         ;;
-                error)   dialog --colors --msgbox --backtitle "$BACKTITLE" "\Z1Error: $message\Zn" $height $width ;; # Red text for errors
-                success) dialog --colors --msgbox --backtitle "$BACKTITLE" "\Z2$message\Zn" $height $width ;;        # Green text for success
-                yesno)   dialog --yesno --backtitle "$BACKTITLE" "$message" $height $width                           # Prompt for yes/no
-                         return $? 
-                         ;;
-                *)       dialog --colors --msgbox --backtitle "$BACKTITLE" "$message" $height $width ;;                       # Default text for info
-            esac ;;
+        local message_expanded 
+        # automatically detirmine the message box size based on the message length
+        message_expanded=$(echo -e "$message")
+        local line_count
+        line_count=$(echo "$message_expanded" | wc -l)
+        local height=$(( line_count + 5 ))
+        local width=$(( ${#message_expanded} + 10 ))
+
+        case "$type" in
+            # detirmine the message type
+            info)
+                # Display an info message in a dialog box   
+                dialog --backtitle "$BACKTITLE" --infobox "$message_expanded" $height $width
+                # Added for debugging
+                wait_for_keypress
+                ;;
+            error)
+                # Red text for errors in a dialog box
+                dialog --colors --backtitle "$BACKTITLE" --msgbox "\Z1Error: $message_expanded\Zn" $height $width
+                ;;
+            success)
+                # Green text for success in a dialog box
+                dialog --colors --backtitle "$BACKTITLE" --msgbox "\Z2$message_expanded\Zn" $height $width
+                ;;
+            yesno)
+                # Prompt for yes/no response in a dialog box
+                dialog --backtitle "$BACKTITLE" --yesno "$message_expanded" $height $width
+                return $? 
+                ;;
+            *)  
+                # Default text for non-specific type
+                dialog --colors --backtitle "$BACKTITLE" --msgbox "$message_expanded" $height $width
+                ;;
+        esac ;;
+      *)
         # Handle other display types if needed
-        *) echo "Invalid display type." ;;
+        # For now, just log an error message
+        log_message "Invalid display type." # Handle other display types if needed 
+        ;;
     esac
 }
 
@@ -124,7 +169,11 @@ function wait_for_keypress {
 function dialog_status {
 
     # Check if the exit status is provided
-    [ $1 -eq 0 ] && display_message "successful." "dialog" "success" || display_message "$2 failed." "dialog" "error"
+    if [ "$1" -eq 0 ]; then
+        display_message "successful." "dialog" "success"
+    else
+        display_message "$2 failed." "dialog" "error"
+    fi
 }
 
 # Function to check if running in a console or terminal
@@ -148,7 +197,7 @@ function backup_file {
     local file="$1"
     # Check if file is provided
     if [ -z "$file" ]; then
-        display_message "No file specified." $display_output "error"
+        display_message "No file specified." "$display_output" "error"
         return 1
     fi
 
@@ -156,26 +205,27 @@ function backup_file {
     if [ -f "$file" ]; then
         # Check if the file is in use
         if lsof "$file" &>/dev/null; then
-            display_message "File $file is currently in use. Cannot create a backup." $display_output "error"
+            display_message "File $file is currently in use. Cannot create a backup." "$display_output" "error"
             return 1
         fi
 
         local backup_index=1
-        local backup_file="$file.bak.$(printf "%02d" $backup_index)"
+        local backup_file
+        # Create a backup file name with an index
+        backup_file="$file.bak.$(printf "%02d" $backup_index)"
         # Find the next available backup file name
         while [ -f "$backup_file" ]; do
             backup_index=$((backup_index + 1))
             backup_file="$file.bak.$(printf "%02d" $backup_index)"
         done
         # Move the file to the next available backup name
-        mv "$file" "$backup_file"
-        if [ $? -ne 0 ]; then
-            display_message "Failed to move $file to $backup_file." $display_output "error"
+        if ! mv "$file" "$backup_file"; then
+            display_message "Failed to move $file to $backup_file." "$display_output" "error"
             return 1
         fi
-        display_message "File moved to $backup_file successfully." $display_output "success"
+        display_message "File moved to $backup_file successfully." "$display_output" "success"
     else
-        display_message "File $file does not exist." $display_output "error"
+        display_message "File $file does not exist." "$display_output" "error"
         return 1
     fi
 }
@@ -188,7 +238,8 @@ function write_file {
     local file="$1"
     shift
     local lines=("$@")
-    local temp_file=$(mktemp)
+    local temp_file
+    temp_file=$(mktemp)
 
     # Write the lines to a temp file
     for line in "${lines[@]}"; do
@@ -197,7 +248,7 @@ function write_file {
 
     # Check if the file was written successfully
     if [ $? -ne 0 ]; then
-        display_message "Failed to write temporary file for $file at $temp_file." $display_output "error"
+        display_message "Failed to write temporary file for $file at $temp_file." "$display_output" "error"
         return 1
     fi
 
@@ -206,11 +257,11 @@ function write_file {
         if [ -w "$file" ]; then
             backup_file "$file"
             if [ $? -ne 0 ]; then
-                display_message "Failed to backup $file." $display_output "error"
+                display_message "Failed to backup $file." "$display_output" "error"
                 return 1
             fi
         else
-            display_message "File $file is not writable." $display_output "error"
+            display_message "File $file is not writable." "$display_output" "error"
             return 1
         fi
     fi
@@ -219,11 +270,11 @@ function write_file {
     if [ -f "$temp_file" ] && [ -w "$temp_file" ]; then
         mv "$temp_file" "$file"
         if [ $? -ne 0 ]; then
-            display_message "Failed to write to $file." $display_output "error"
+            display_message "Failed to write to $file." "$display_output" "error"
             return 1
         fi
     else
-        display_message "Temporary file $temp_file does not exist or is not writable." $display_output "error"
+        display_message "Temporary file $temp_file does not exist or is not writable." "$display_output" "error"
         return 1
     fi
 }
@@ -239,15 +290,28 @@ function check_sudo {
 
     # Check if sudo is installed
     if ! command -v sudo &> /dev/null; then
-        display_message "'sudo' is not installed. Please install it and try again." $display_output "error"
+        display_message "'sudo' is not installed. Please install it and try again." "$display_output" "error"
         return 1
     fi
     # Check if the user has sudo privileges
     if ! sudo -n true 2>/dev/null; then
-        display_message "You do not have permission to use 'sudo' or a password is required." $display_output "error"
+        display_message "You do not have permission to use 'sudo' or a password is required." "$display_output" "error"
         return 1
     fi
     return 0
+}
+
+# Function to check if the script is running as root
+# This function checks if the script is being run as root (user ID 0)
+# or if running with sudo privileges, and returns true.
+# If the script is not running as root, it will return false.
+function check_if_running_as_root {
+    # Check if the script is running as root
+    if [ "$(id -u)" -eq 0 ]; then
+        return 0  # Running as root
+    else
+        return 1  # Not running as root
+    fi
 }
 
 # Function to run a command with sudo 
@@ -260,13 +324,13 @@ function run_with_sudo {
     # Check if sudo is available
     if ! check_sudo; then
         display_message "Please enter the root password to run the command." "console"
-        read -s root_password
+        read -r -s root_password
         echo
         su -c "$*" <<EOF
 $root_password
 EOF
         if [ $? -ne 0 ]; then
-            display_message "Failed to execute the command with root privileges." $display_output "error"
+            display_message "Failed to execute the command with root privileges." "$display_output" "error"
             return 1
         fi
     else
@@ -275,7 +339,7 @@ EOF
     fi
     # Check if the command was successful
     if [ $? -ne 0 ]; then
-        display_message "Failed to execute the command: $*" $display_output "error"
+        display_message "Failed to execute the command: $*" "$display_output" "error"
         return 1
     fi
     return 0
@@ -312,14 +376,20 @@ function list_files {
     local extension="$2"
     local options=("$3")
     if [ -d "$dir" ]; then
-        local files=$(find "$dir" -type f -name "*.$extension" | sort)
+        local files
+        # Find files with the specified extension in the directory
+        # Sort the files alphabetically 
+        files=$(find "$dir" -type f -name "*.$extension" | sort)
         local index=2
         for file in $files; do
-            local name=$(basename "$file")
+            # Get the base name of the file 
+            local name
+            name=$(basename "$file")
             options+=("$index" "  $name")
             ((index++))
         done
     else
+        # If the directory does not exist, display an error message
         display_message "Directory $dir not found." "dialog" "error"
         return 1
     fi

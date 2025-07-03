@@ -21,40 +21,40 @@ function create_config {
 
     # Check if the directory exists
     if ! [ -d "$(dirname $COMMODEBIAN_CONF)" ]; then
-        display_message "Configuration directory does not exist." $display_output "error"
+        display_message "Configuration directory does not exist." "$display_output" "error"
         return 1
     fi
 
     # Check if the config file already exists
     if [ -f $COMMODEBIAN_CONF ]; then
-        display_message "Config file already exists." $display_output "error"
+        display_message "Config file already exists." "$display_output" "error"
         # check if the file is readable
         if ! [ -r "$COMMODEBIAN_CONF" ]; then
-            display_message "Configuration file is not readable." $display_output "error"
+            display_message "Configuration file is not readable." "$display_output" "error"
             return 1
         fi
         # check if the file is writable
         if ! [ -w "$COMMODEBIAN_CONF" ]; then
-            display_message "Configuration file is not writable." $display_output "error"
+            display_message "Configuration file is not writable." "$display_output" "error"
             return 1
         fi
         # check if the file is valid
         if ! bash -n "$COMMODEBIAN_CONF"; then
-            display_message "Configuration file contains syntax errors." $display_output "error"
+            display_message "Configuration file contains syntax errors." "$display_output" "error"
             return 1
         fi
         # check if the file is empty
         if [ ! -s "$COMMODEBIAN_CONF" ]; then
-            display_message "Configuration file is empty." $display_output "error"
+            display_message "Configuration file is empty." "$display_output" "error"
             return 1
         fi
 
-        display_message "Loading configuration file..." $display_output "info"
+        display_message "Loading configuration file..." "$display_output" "info"
         # load the config file
         source $COMMODEBIAN_CONF
         # check if file loaded correctly
         if [ $? -ne 0 ]; then
-            display_message "Could not load config file." $display_output "error"
+            display_message "Could not load config file." "$display_output" "error"
             return 1
         fi
 
@@ -64,14 +64,14 @@ function create_config {
             return 0
         else
             # version not found display error
-            display_message "Could not load version from config file." $display_output "error"
+            display_message "Could not load version from config file." "$display_output" "error"
             return 1
         fi
     fi
 
     # Check if the file can be created
     if ! run_with_sudo touch "$COMMODEBIAN_CONF"; then
-        display_message "Could not create config file." $display_output "error"
+        display_message "Could not create config file." "$display_output" "error"
         return 1
     fi
 
@@ -99,12 +99,12 @@ function create_config {
     )
     # Use the write_file function to write the configuration
     run_with_sudo write_file "$COMMODEBIAN_CONF" config_lines[@]
-    [ $? -eq 0 ] && chmod 666 "$COMMODEBIAN_CONF" && display_message "Configuration file created successfully." $display_output "success" || { display_message "Could not create config file." $display_output "error"; return 1; }
+    [ $? -eq 0 ] && chmod 666 "$COMMODEBIAN_CONF" && display_message "Configuration file created successfully." "$display_output" "success" || { display_message "Could not create config file." "$display_output" "error"; return 1; }
 
     # Set the file permissions
     run_with_sudo chmod 666 $COMMODEBIAN_CONF
     if [ $? -ne 0 ]; then
-        display_message "Failed to set permissions for $COMMODEBIAN_CONF." $display_output "error"
+        display_message "Failed to set permissions for $COMMODEBIAN_CONF." "$display_output" "error"
         return 1
     fi
 }
@@ -126,31 +126,31 @@ function check_config {
 
     # Check if the configuration file exists
     if [ ! -f "$COMMODEBIAN_CONF" ]; then
-        display_message "Configuration file not found at $COMMODEBIAN_CONF." $display_output "error"
-        display_message "Would you like to create it?" $display_output "yesno"
+        display_message "Configuration file not found at $COMMODEBIAN_CONF." "$display_output" "error"
+        display_message "Would you like to create it?" "$display_output" "yesno"
         if [ $? -eq 0 ]; then
             run_with_sudo create_config
             if [ $? -ne 0 ]; then
-                display_message "Failed to create configuration file. Please check permissions." $display_output "error"
+                display_message "Failed to create configuration file. Please check permissions." "$display_output" "error"
                 return 1
             fi
         else
-            display_message "Commodebian is not setup." $display_output "error"
+            display_message "Commodebian is not setup." "$display_output" "error"
             return 1
         fi
     fi
 
     # Check if the configuration file is readable
     if [ ! -r "$COMMODEBIAN_CONF" ]; then
-        display_message "Configuration file at $COMMODEBIAN_CONF is not readable." $display_output "error"
-        display_message "Would you like to change the permissions?" $display_output "yesno"
+        display_message "Configuration file at $COMMODEBIAN_CONF is not readable." "$display_output" "error"
+        display_message "Would you like to change the permissions?" "$display_output" "yesno"
         if [ $? -eq 0 ]; then
             run_with_sudo chmod 666 "$COMMODEBIAN_CONF"
             if [ $? -ne 0 ]; then
-                display_message "Failed to set permissions for $COMMODEBIAN_CONF." $display_output "error"
+                display_message "Failed to set permissions for $COMMODEBIAN_CONF." "$display_output" "error"
                 return 1
             fi
-            #display_message "Permissions set for $COMMODEBIAN_CONF." $display_output "success"
+            #display_message "Permissions set for $COMMODEBIAN_CONF." "$display_output" "success"
         else
             return 1
         fi
@@ -158,15 +158,15 @@ function check_config {
 
     # Check if the configuration file is writable
     if [ ! -w "$COMMODEBIAN_CONF" ]; then
-        display_message "Configuration file at $COMMODEBIAN_CONF is not writable." $display_output "error"
-        display_message "Would you like to change the permissions?" $display_output "yesno"
+        display_message "Configuration file at $COMMODEBIAN_CONF is not writable." "$display_output" "error"
+        display_message "Would you like to change the permissions?" "$display_output" "yesno"
         if [ $? -eq 0 ]; then
             run_with_sudo chmod 666 "$COMMODEBIAN_CONF"
             if [ $? -ne 0 ]; then
-                display_message "Failed to set permissions for $COMMODEBIAN_CONF." $display_output "error"
+                display_message "Failed to set permissions for $COMMODEBIAN_CONF." "$display_output" "error"
                 return 1
             fi
-            #display_message "Permissions set for $COMMODEBIAN_CONF." $display_output "success"
+            #display_message "Permissions set for $COMMODEBIAN_CONF." "$display_output" "success"
         else
             return 1
         fi
@@ -174,8 +174,8 @@ function check_config {
 
     # Validate the file's syntax without executing it
     while ! bash -n "$COMMODEBIAN_CONF"; do
-        display_message "Configuration file at $COMMODEBIAN_CONF contains syntax errors." $display_output "error"
-        display_message "Would you like to edit the file?" $display_output "yesno"
+        display_message "Configuration file at $COMMODEBIAN_CONF contains syntax errors." "$display_output" "error"
+        display_message "Would you like to edit the file?" "$display_output" "yesno"
         if [ $? -eq 0 ]; then
             # Use dialog or nano to edit the file
             if [ "$display_output" = "dialog" ]; then
@@ -183,7 +183,7 @@ function check_config {
                 if [ $? -eq 0 ]; then
                     mv "$TEMP_FILE" "$COMMODEBIAN_CONF"
                 else
-                    display_message "Failed to edit configuration file." $display_output "error"
+                    display_message "Failed to edit configuration file." "$display_output" "error"
                     return 1
                 fi
             else
@@ -191,21 +191,21 @@ function check_config {
                 # Validate the file again
                 bash -n "$COMMODEBIAN_CONF"
                 if [ $? -ne 0 ]; then
-                    display_message "Configuration file contains syntax errors." $display_output "error"
+                    display_message "Configuration file contains syntax errors." "$display_output" "error"
                     return 1
                 else
-                    display_message "Configuration file updated successfully." $display_output "success"
+                    display_message "Configuration file updated successfully." "$display_output" "success"
                 fi
             fi
         else
             # If the user chooses not to edit, exit with an error
-            display_message "Please fix the syntax errors in $COMMODEBIAN_CONF." $display_output "error"
+            display_message "Please fix the syntax errors in $COMMODEBIAN_CONF." "$display_output" "error"
             return 1
         fi
     done
 
     # If all checks pass, return success
-    display_message "Configuration file is valid and ready to use." $display_output "success"
+    display_message "Configuration file is valid and ready to use." "$display_output" "success"
     return 0
 }
 
@@ -223,7 +223,7 @@ function load_config {
     # Load the configuration file
     source "$COMMODEBIAN_CONF"
     if [ $? -ne 0 ]; then
-        display_message "Could not load configuration file." $display_output "error"
+        display_message "Could not load configuration file." "$display_output" "error"
         return 1
     fi
 }
@@ -242,32 +242,35 @@ function change_config {
 
     # Ensure the variable name is provided
     if [ -z "$1" ]; then
-        display_message "No variable specified." $display_output "error"
+        display_message "No variable specified." "$display_output" "error"
         return 1
     fi
 
     # Ensure the value is provided
     if [ -z "$2" ]; then
-        display_message "No value specified." $display_output "error"
+        display_message "No value specified." "$display_output" "error"
         return 1
     fi
 
     # Define variables
     local key="$1"
     local value="$2"
-    local escaped_key=$(printf '%s' "$key" | sed 's/[\/&]/\\&/g')  # Simplified escaping
-    local escaped_value=$(printf '%s' "$value" | sed 's/[\/&]/\\&/g')  # Escape value for sed
+    local escaped_key
+    escaped_key=$(printf '%s' "$key" | sed 's/[\/&]/\\&/g')  # Simplified escaping
+    local escaped_value
+    escaped_value=$(printf '%s' "$value" | sed 's/[\/&]/\\&/g')  # Escape value for sed
 
     # Check directory permissions
-    local config_dir=$(dirname "$COMMODEBIAN_CONF")
+    local config_dir
+    config_dir=$(dirname "$COMMODEBIAN_CONF")
     if [ ! -w "$config_dir" ]; then
-        display_message "Directory $config_dir is not writable.\nRun with sudo or fix permissions." $display_output "error"
+        display_message "Directory $config_dir is not writable.\nRun with sudo or fix permissions." "$display_output" "error"
         return 1
     fi
 
     # Check file permissions explicitly
     if [ ! -w "$COMMODEBIAN_CONF" ]; then
-        display_message "Config file $COMMODEBIAN_CONF is not writable.\nCheck permissions." $display_output "error"
+        display_message "Config file $COMMODEBIAN_CONF is not writable.\nCheck permissions." "$display_output" "error"
         return 1
     fi
 
@@ -275,24 +278,24 @@ function change_config {
     if grep -q "^$escaped_key=" "$COMMODEBIAN_CONF"; then
         sed -i "s|^$escaped_key=.*|$escaped_key=\"$escaped_value\"|" "$COMMODEBIAN_CONF"
         if [ $? -ne 0 ]; then
-            display_message "Failed to update $key in $COMMODEBIAN_CONF." $display_output "error"
+            display_message "Failed to update $key in $COMMODEBIAN_CONF." "$display_output" "error"
             return 1
         fi
     else
         # Add the variable if it doesn’t exist
         echo "$escaped_key=\"$escaped_value\"" >> "$COMMODEBIAN_CONF"
         if [ $? -ne 0 ]; then
-            display_message "Failed to append $key to $COMMODEBIAN_CONF." $display_output "error"
+            display_message "Failed to append $key to $COMMODEBIAN_CONF." "$display_output" "error"
             return 1
         fi
     fi
 
     # Verify the change (more flexible match)
     if grep -q "^$escaped_key=\"[^\"]*\"$" "$COMMODEBIAN_CONF"; then
-        display_message "Configuration updated successfully.\n$key set to \"$value\"." $display_output "success"
+        display_message "Configuration updated successfully.\n$key set to \"$value\"." "$display_output" "success"
         return 0
     else
-        display_message "Could not verify update for $key.\nFile contents:\n$(cat "$COMMODEBIAN_CONF")" $display_output "error"
+        display_message "Could not verify update for $key.\nFile contents:\n$(cat "$COMMODEBIAN_CONF")" "$display_output" "error"
         return 1
     fi
 }
@@ -309,23 +312,23 @@ function reset_config {
     check_config || return 1
 
     # Prompt for confirmation before resetting
-    display_message "Are you sure you want to reset the configuration file? This will delete all current settings." $display_output "yesno"
+    display_message "Are you sure you want to reset the configuration file? This will delete all current settings." "$display_output" "yesno"
     if [ $? -ne 0 ]; then
-        display_message "Resetting configuration aborted." $display_output "info"
+        display_message "Resetting configuration aborted." "$display_output" "info"
         return 1
     fi
 
     # Reset the configuration file by removing it
     run_with_sudo rm -f "$COMMODEBIAN_CONF"
     if [ $? -ne 0 ]; then
-        display_message "Failed to reset configuration file." $display_output "error"
+        display_message "Failed to reset configuration file." "$display_output" "error"
         return 1
     fi
 
     # Create a new configuration file
     create_config || return 1
 
-    display_message "Configuration file has been reset successfully." $display_output "success"
+    display_message "Configuration file has been reset successfully." "$display_output" "success"
     return 0
 }
 
@@ -339,14 +342,14 @@ function install_autostart {
 
     # Check if the user is root
     if [ "$ROOT" = "true" ]; then
-        display_message "Probably not a good idea to install a root profile." $display_output "error"
+        display_message "Probably not a good idea to install a root profile." "$display_output" "error"
         return 1
     fi
     # Ensure the .profile file exists
     if ! [ -f "$PROFILE_FILE" ]; then
         touch "$PROFILE_FILE"
         if ! [ $? -eq 0 ]; then
-            display_message "Could not create $PROFILE_FILE." $display_output "error"
+            display_message "Could not create $PROFILE_FILE." "$display_output" "error"
             return 1
         fi
     fi
@@ -361,11 +364,11 @@ function install_autostart {
     # Ensure all lines are written correctly
     for line in "${PROFILE_AUTOSTART_LINES[@]}"; do
         if ! grep -Fxq "$line" "$PROFILE_FILE"; then
-            display_message "Failed to write line: $line" $display_output "error"
+            display_message "Failed to write line: $line" "$display_output" "error"
             return 1
         fi
     done
-    display_message "Autostart setup completed successfully!" $display_output "success"
+    display_message "Autostart setup completed successfully!" "$display_output" "success"
 }
 
 # Function to remove autostart
@@ -378,17 +381,17 @@ function remove_autostart {
 
     # Check if the user is root
     if [ "$ROOT" = "true" ]; then
-        display_message "Probably not a good idea to remove a root profile." $display_output "error"
+        display_message "Probably not a good idea to remove a root profile." "$display_output" "error"
         return 1
     fi
     # Ensure the .profile file exists
     if ! [ -f "$PROFILE_FILE" ]; then
-        display_message "$PROFILE_FILE does not exist." $display_output "error"
+        display_message "$PROFILE_FILE does not exist." "$display_output" "error"
         return 1
     fi
     # Check if there are any lines to remove
     if [ ${#PROFILE_AUTOSTART_LINES[@]} -eq 0 ]; then
-        display_message "No autostart lines to remove." $display_output "info"
+        display_message "No autostart lines to remove." "$display_output" "info"
         return 0
     fi
     # Escape special characters in the lines for sed
@@ -397,7 +400,7 @@ function remove_autostart {
         sed -i "/$escaped_line/d" "$PROFILE_FILE"
     done
 
-    display_message "Autostart removed successfully!" $display_output "success"
+    display_message "Autostart removed successfully!" "$display_output" "success"
 }
 
 # Function to edit the user profile
@@ -463,7 +466,7 @@ function enable_user_autologin {
     if [ ! -d "$OVERRIDE_DIR" ]; then
         run_with_sudo mkdir -p "$OVERRIDE_DIR"
         if [ $? -ne 0 ]; then
-            display_message "Failed to create directory $OVERRIDE_DIR." $display_output "error"
+            display_message "Failed to create directory $OVERRIDE_DIR." "$display_output" "error"
             safe_exit 1
         fi
     fi
@@ -478,14 +481,14 @@ function enable_user_autologin {
     # Write the autologin override configuration using the write_file function
     run_with_sudo write_file "$OVERRIDE_FILE" autologin_lines
     if [ $? -ne 0 ]; then
-        display_message "Failed to write autologin configuration to $OVERRIDE_FILE." $display_output "error"
+        display_message "Failed to write autologin configuration to $OVERRIDE_FILE." "$display_output" "error"
         safe_exit 1
     fi
 
     # Reload systemd to apply changes
     run_with_sudo systemctl daemon-reload
     if [ $? -ne 0 ]; then
-        display_message "Failed to reload systemd configuration." $display_output "error"
+        display_message "Failed to reload systemd configuration." "$display_output" "error"
         safe_exit 1
     fi
 
@@ -493,7 +496,7 @@ function enable_user_autologin {
     run_with_sudo systemctl enable "$GETTY_SERVICE" 2>/dev/null
 
     # Inform the user
-    display_message "Autologin configured for user '$USER' on TTY1." $display_output "success"
+    display_message "Autologin configured for user '$USER' on TTY1." "$display_output" "success"
 }
 
 #function to disable user autologin
@@ -512,16 +515,16 @@ function disable_user_autologin {
     if [ -f "$OVERRIDE_FILE" ]; then
         rm "$OVERRIDE_FILE"
         if [ $? -ne 0 ]; then
-            display_message "Failed to remove autologin configuration from $OVERRIDE_FILE." $display_output "error"
+            display_message "Failed to remove autologin configuration from $OVERRIDE_FILE." "$display_output" "error"
             safe_exit 1
         fi
     fi
     # Reload systemd to apply changes
     run_with_sudo systemctl daemon-reload
     if [ $? -ne 0 ]; then
-        display_message "Failed to reload systemd configuration." $display_output "error"
+        display_message "Failed to reload systemd configuration." "$display_output" "error"
         safe_exit 1
     fi
     # Inform the user
-    display_message "Autologin disabled for user '$USER' on TTY1." $display_output "success"
+    display_message "Autologin disabled for user '$USER' on TTY1." "$display_output" "success"
 }
